@@ -1,30 +1,28 @@
 const cmu_dictionary = require("cmu-pronouncing-dictionary");
 
-const MAX_DISTANCE = 10;
-
 const getArpabet = word => cmu_dictionary[word];
 
 const getRelationshipMatrix = (phonemes, maxDistance) => {
   const matrix = [];
   for (let distance = 1; distance <= maxDistance; distance++) {
     const similarities = [];
-    for (let pos = 0; pos < phonemes.length - distance) {
+    for (let pos = 0; pos < phonemes.length - distance; pos++) {
       const p0 = phonemes[pos];
       const p1 = phonemes[pos + distance];
-      if (p0 === p1 && p0 !== '') {
+      if (p0 === p1 && p0 !== "") {
         similarities.push(1);
       } else {
         similarities.push(0);
       }
     }
 
-    mastrix.push(similarities);
+    matrix.push(similarities);
   }
 
   return matrix;
 };
 
-const isVowel = phoneme => phoneme.length > 2
+const isVowel = phoneme => phoneme.length > 2;
 
 class Rhyme {
   constructor(indices, similarity) {
@@ -36,9 +34,9 @@ class Rhyme {
   terminate() {
     while (this.pattern.length && this.pattern[this.pattern.length - 1] <= 0) {
       this.pattern.pop();
-    };
+    }
 
-    return null;
+    return this.pattern.length;
   }
 
   addRelated(similarity) {
@@ -84,35 +82,45 @@ const getRhymesFromMatrix = (matrix, phonemes) => {
         if (rhyme) {
           let p1 = phonemes[sIdx + distance];
           if (!p0 || !p1 || !rhyme.addUnrelated(p0, p1)) {
-            rhyme = rhyme.terminate();
+            if (rhyme.terminate()) {
+              rhymes.push(rhyme);
+            }
+            rhyme = null;
           }
         }
       } else {
         if (rhyme) {
-          rhyme.addRelated(similarity)
+          rhyme.addRelated(similarity);
         } else {
           rhyme = new Rhyme([sIdx, sIdx + distance], similarity);
         }
       }
 
       // A sequence should not overlap with itself
-      if (rhmye && rhyme.length() >= distance) {
-        rhyme = rhyme.terminate();
+      if (rhyme && rhyme.length() >= distance) {
+        if (rhyme.terminate()) {
+          rhymes.push(rhyme);
+        }
+        rhyme = null;
       }
     });
 
     // End rhyme at the end of the verse
     if (rhyme) {
-      rhyme = rhyme.terminate();
+      if (rhyme.terminate()) {
+        rhymes.push(rhyme);
+      }
+      rhyme = null;
     }
   });
 
   // Do what with the rhyme?
   return rhymes;
-}
+};
 
-const getScore = str => {
+exports.getRhymeScore = str => {
   str = str
+    .toLowerCase()
     .replace(/[.,\/#!$%\^&\*;:{}=\_`~()]/g, "") // Remove all punctuation apart from apostrophes
     .replace("-", " ") // Remove hyphens
     .replace(/\s+/g, " "); // Remove spaces
@@ -131,12 +139,11 @@ const getScore = str => {
     })
     .flat();
 
-  console.log(phonemes.join(" "));
+  const matrix = getRelationshipMatrix(phonemes, 50);
+  const rhymes = getRhymesFromMatrix(matrix, phonemes);
+
+  return rhymes.length * 10;
 };
 
-let str = `drowsy bits and; pieces
-word all-nighter he's 1234 fat`;
-
-getScore(str);
-
-console.log(getArpabet("dong"));
+//let str = `In the beginning we were winning`;
+//getRhymeScore(str);
