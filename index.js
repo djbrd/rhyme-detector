@@ -1,5 +1,18 @@
 const cmu_dictionary = require("cmu-pronouncing-dictionary");
 
+// Flatten arrays is experimental feature in recent versions of Node.js, AWS Lambda doesn't support it
+const flatten = (arr, result = []) => {
+  for (let i = 0, length = arr.length; i < length; i++) {
+    const value = arr[i];
+    if (Array.isArray(value)) {
+      flatten(value, result);
+    } else {
+      result.push(value);
+    }
+  }
+  return result;
+};
+
 const getArpabet = word => cmu_dictionary[word];
 
 const getRelationshipMatrix = (phonemes, maxDistance) => {
@@ -127,17 +140,15 @@ exports.getRhymeScore = str => {
 
   // Split resulting string into words
   const words = str.split(" ");
-  words.forEach(word => console.log(word));
 
   // Convert words to phonemes (arpabet)
-  const phonemes = words
+  const phonemes = flatten(words
     .map(word => {
       const arpabet = getArpabet(word);
       return arpabet === undefined
         ? Array(word.length).fill("")
         : arpabet.split(" ");
-    })
-    .flat();
+    }));
 
   const matrix = getRelationshipMatrix(phonemes, 50);
   const rhymes = getRhymesFromMatrix(matrix, phonemes);
