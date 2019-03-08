@@ -4,6 +4,19 @@ const RHYME_SCORE = 10;
 const KEYWORD_SCORE = 20;
 const KEY_PHRASE_SCORE = 50;
 
+// Flatten arrays is experimental feature in recent versions of Node.js, AWS Lambda doesn't support it
+const flatten = (arr, result = []) => {
+  for (let i = 0, length = arr.length; i < length; i++) {
+    const value = arr[i];
+    if (Array.isArray(value)) {
+      flatten(value, result);
+    } else {
+      result.push(value);
+    }
+  }
+  return result;
+};
+
 const getArpabet = word => cmu_dictionary[word];
 
 const getRelationshipMatrix = (phonemes, maxDistance) => {
@@ -146,17 +159,15 @@ const getPhonemes = str => {
 
   // Split resulting string into words
   const words = str.split(" ");
-  words.forEach(word => console.log(word));
 
   // Convert words to phonemes (arpabet)
-  const phonemes = words
+  const phonemes = flatten(words
     .map(word => {
       const arpabet = getArpabet(word);
       return arpabet === undefined
         ? Array(word.length).fill("")
         : arpabet.split(" ");
-    })
-    .flat();
+    }));
 
   return phonemes;
 };
