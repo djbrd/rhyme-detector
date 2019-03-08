@@ -1,5 +1,9 @@
 const cmu_dictionary = require("cmu-pronouncing-dictionary");
 
+const RHYME_SCORE = 10;
+const KEYWORD_SCORE = 20;
+const KEY_PHRASE_SCORE = 50;
+
 const getArpabet = word => cmu_dictionary[word];
 
 const getRelationshipMatrix = (phonemes, maxDistance) => {
@@ -68,7 +72,27 @@ class Rhyme {
   length() {
     return this.pattern.length;
   }
+
+  isDuplicateOf(other) {
+    if (
+      other.indices[0] === this.indices[0] &&
+      other.pattern.join() == this.pattern.join()
+    ) {
+      return true;
+    }
+    return false;
+  }
 }
+
+const terminateAndAddRhyme = (rhyme, rhymes) => {
+  if (
+    rhyme.terminate() &&
+    !rhymes.some(existing => rhyme.isDuplicateOf(existing))
+  ) {
+    rhymes.push(rhyme);
+  }
+  return null;
+};
 
 const getRhymesFromMatrix = (matrix, phonemes) => {
   const rhymes = [];
@@ -82,10 +106,7 @@ const getRhymesFromMatrix = (matrix, phonemes) => {
         if (rhyme) {
           let p1 = phonemes[sIdx + distance];
           if (!p0 || !p1 || !rhyme.addUnrelated(p0, p1)) {
-            if (rhyme.terminate()) {
-              rhymes.push(rhyme);
-            }
-            rhyme = null;
+            rhyme = terminateAndAddRhyme(rhyme, rhymes);
           }
         }
       } else {
@@ -98,19 +119,13 @@ const getRhymesFromMatrix = (matrix, phonemes) => {
 
       // A sequence should not overlap with itself
       if (rhyme && rhyme.length() >= distance) {
-        if (rhyme.terminate()) {
-          rhymes.push(rhyme);
-        }
-        rhyme = null;
+        rhyme = terminateAndAddRhyme(rhyme, rhymes);
       }
     });
 
     // End rhyme at the end of the verse
     if (rhyme) {
-      if (rhyme.terminate()) {
-        rhymes.push(rhyme);
-      }
-      rhyme = null;
+      rhyme = terminateAndAddRhyme(rhyme, rhymes);
     }
   });
 
@@ -118,12 +133,16 @@ const getRhymesFromMatrix = (matrix, phonemes) => {
   return rhymes;
 };
 
-exports.getRhymeScore = str => {
-  str = str
+const purgeString = str => {
+  return str
     .toLowerCase()
     .replace(/[.,\/#!$%\^&\*;:{}=\_`~()]/g, "") // Remove all punctuation apart from apostrophes
     .replace("-", " ") // Remove hyphens
     .replace(/\s+/g, " "); // Remove spaces
+};
+
+const getPhonemes = str => {
+  str = purgeString(str);
 
   // Split resulting string into words
   const words = str.split(" ");
@@ -139,11 +158,46 @@ exports.getRhymeScore = str => {
     })
     .flat();
 
-  const matrix = getRelationshipMatrix(phonemes, 50);
-  const rhymes = getRhymesFromMatrix(matrix, phonemes);
-
-  return rhymes.length * 10;
+  return phonemes;
 };
 
-//let str = `In the beginning we were winning`;
-//getRhymeScore(str);
+const getRhymes = str => {
+  const phonemes = getPhonemes(str);
+  const matrix = getRelationshipMatrix(phonemes, 50);
+  const rhymes = getRhymesFromMatrix(matrix, phonemes);
+  return rhymes;
+};
+
+const getRhymeScore = input => {
+  const str = purgeString(input);
+  const rhymes = getRhymes(str);
+  return rhymes.length * RHYME_SCORE;
+};
+
+const getKeywordScore = (str, keywords) => {
+  const count = keywords.reduce((count, keyword) => {
+    return str.indexOf(keyword.toLowerCase()) > -1 ? ++count : count;
+  }, 0);
+  return count * KEYWORD_SCORE;
+};
+
+const getKeyPhraseScore = (str, keyPhrases) => {
+  const count = keyPhrases.reduce((count, keyPhrase) => {
+    return str.indexOf(purgeString(keyPhrase)) > -1 ? ++count : count;
+  }, 0);
+  return count * KEY_PHRASE_SCORE;
+};
+
+const getScore = (input, keywords = [], keyPhrases = []) => {
+  const str = purgeString(input);
+  const rhymeScore = getRhymeScore(str);
+  const keywordScore = getKeywordScore(str, keywords);
+  const keyPhraseScore = getKeyPhraseScore(str, keyPhrases);
+  return rhymeScore + keywordScore + keyPhraseScore;
+};
+
+exports.getRhymeScore = getRhymeScore;
+exports.getScore = getScore;
+
+//let str = `Here to create, too late to hate`;
+//console.log(exports.getScore(str, ["wait", "late"], ["Here to create"]));
